@@ -1,0 +1,60 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NDK_REV: r27c
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v5
+        id: ndk-cache
+        with:
+          path: android-ndk-r27c
+          key: ndk-r27c
+
+      - name: setup ndk
+        if: steps.ndk-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSLo ndk.zip \
+            https://dl.google.com/android/repository/android-ndk-${NDK_REV}-linux.zip
+          unzip -q ndk.zip
+
+      - name: build all archs
+        run: |
+          NDK=$PWD/android-ndk-${NDK_REV}/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+          for target in \
+            "aarch64-linux-android21:arm64-v8a" \
+            "armv7a-linux-androideabi21:armeabi-v7a" \
+            "x86_64-linux-android21:x86_64"
+          do
+            triple="${target%%:*}"
+            abi="${target##*:}"
+            cd src && make clean && cd ..
+
+            cd src && make \
+              CC="$NDK/${triple}-clang" \
+              STRIP="$NDK/llvm-strip" \
+              OUT="../scmd/bin/${abi}/scmd" && cd ..
+
+            file "scmd/bin/${abi}/scmd"
+          done
+
+      - name: fix update-binary perms
+        run: chmod +x scmd/META-INF/com/google/android/update-binary
+
+      - name: package
+        run: |
+          (cd scmd && zip -r ../scmd-magisk.zip .)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: scmd-magisk
+          path: scmd-magisk.zip
+          archive: false

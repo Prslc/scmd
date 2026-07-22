@@ -1,0 +1,6 @@
+id=scmd
+name=Smart Charge Daemon
+version=v1.0.0
+versionCode=1
+author=Prslc
+description=Event-driven battery charge controller. Zero CPU — epoll + netlink uevent, no polling.
